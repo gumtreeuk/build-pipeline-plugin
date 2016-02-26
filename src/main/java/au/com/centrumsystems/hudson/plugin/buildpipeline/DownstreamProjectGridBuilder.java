@@ -1,5 +1,10 @@
 package au.com.centrumsystems.hudson.plugin.buildpipeline;
 
+import au.com.centrumsystems.hudson.plugin.buildpipeline.filters.BuildParameterFilter;
+import au.com.centrumsystems.hudson.plugin.buildpipeline.filters.UserFilter;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import hudson.Extension;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
@@ -8,11 +13,11 @@ import hudson.model.ItemGroup;
 import hudson.model.ParametersDefinitionProperty;
 import hudson.util.AdaptedIterator;
 import hudson.util.HttpResponses;
+import hudson.util.Iterators;
 import hudson.util.ListBoxModel;
-
 import jenkins.model.Jenkins;
 import jenkins.util.TimeDuration;
-
+import org.acegisecurity.AccessDeniedException;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.HttpResponse;
@@ -21,12 +26,10 @@ import org.kohsuke.stapler.StaplerResponse;
 import org.kohsuke.stapler.interceptor.RequirePOST;
 
 import javax.servlet.ServletException;
-
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
-
-import org.acegisecurity.AccessDeniedException;
+import java.util.List;
 
 /**
  * {@link ProjectGridBuilder} based on the upstream/downstream relationship.
@@ -100,6 +103,9 @@ public class DownstreamProjectGridBuilder extends ProjectGridBuilder {
             }
         }
 
+        private List<Predicate<AbstractBuild<?, ?>>> buildFilters =
+                Lists.<Predicate<AbstractBuild<?, ?>>>newArrayList(new UserFilter(), new BuildParameterFilter());
+
         /**
          * Factory for {@link Iterator}.
          */
@@ -111,7 +117,21 @@ public class DownstreamProjectGridBuilder extends ProjectGridBuilder {
                 }
 
                 final Iterator<? extends AbstractBuild<?, ?>> base = start.getBuilds().iterator();
-                return new AdaptedIterator<AbstractBuild<?, ?>, BuildGrid>(base) {
+
+
+                Iterators.FilterIterator<AbstractBuild<?, ?>> filtered = new Iterators.FilterIterator<AbstractBuild<?, ?>>(base) {
+                    @Override
+                    protected boolean filter(final AbstractBuild<?, ?> build) {
+                        return !Iterables.tryFind(buildFilters, new Predicate<Predicate<AbstractBuild<?, ?>>>() {
+                            @Override
+                            public boolean apply(Predicate<AbstractBuild<?, ?>> filter) {
+                                return !filter.apply(build);
+                            }
+                        }).isPresent();
+                    }
+                };
+
+                return new AdaptedIterator<AbstractBuild<?, ?>, BuildGrid>(filtered) {
                     @Override
                     protected BuildGrid adapt(AbstractBuild<?, ?> item) {
                         return new BuildGridImpl(new BuildForm(context, new PipelineBuild(item)));

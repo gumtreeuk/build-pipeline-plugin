@@ -252,6 +252,24 @@
                             <span>Manage</span>
                         </a>
                     </div>
+                    <div class="icon-container">
+                        <a href="${rootURL}?BUILD_BRANCH=stable">
+                            <img src="${rootURL}/images/24x24/search.png" />
+                            <span>Stable Builds</span>
+                        </a>
+                    </div>
+                    <div class="icon-container">
+                        <a href="${rootURL}?user=me">
+                            <img src="${rootURL}/images/24x24/search.png" />
+                            <span>My Builds</span>
+                        </a>
+                    </div>
+                    <div class="icon-container">
+                        <a href="${rootURL}?DEPLOYABLES=*Buyer%2CSeller">
+                            <img src="${rootURL}/images/24x24/search.png" />
+                            <span>Only Buyer/Seller</span>
+                        </a>
+                    </div>
                 </j:if>
             </div>
 

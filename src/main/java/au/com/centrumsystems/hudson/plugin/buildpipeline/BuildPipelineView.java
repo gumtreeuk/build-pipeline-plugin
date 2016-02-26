@@ -24,26 +24,28 @@
  */
 package au.com.centrumsystems.hudson.plugin.buildpipeline;
 
+import au.com.centrumsystems.hudson.plugin.buildpipeline.trigger.BuildPipelineTrigger;
+import au.com.centrumsystems.hudson.plugin.util.BuildUtil;
+import au.com.centrumsystems.hudson.plugin.util.ProjectUtil;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
-
 import com.google.common.collect.Sets;
 import hudson.Extension;
-import hudson.model.Action;
-import hudson.model.Item;
-import hudson.model.ItemGroup;
-import hudson.model.ParameterValue;
-import hudson.model.TopLevelItem;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
+import hudson.model.Action;
 import hudson.model.Cause;
 import hudson.model.Cause.UserIdCause;
 import hudson.model.CauseAction;
 import hudson.model.Descriptor;
 import hudson.model.Descriptor.FormException;
 import hudson.model.Hudson;
+import hudson.model.Item;
+import hudson.model.ItemGroup;
+import hudson.model.ParameterValue;
 import hudson.model.ParametersAction;
 import hudson.model.Run;
+import hudson.model.TopLevelItem;
 import hudson.model.View;
 import hudson.model.ViewDescriptor;
 import hudson.plugins.parameterizedtrigger.AbstractBuildParameters;
@@ -52,10 +54,16 @@ import hudson.plugins.parameterizedtrigger.BuildTriggerConfig;
 import hudson.security.Permission;
 import hudson.tasks.Publisher;
 import hudson.util.DescribableList;
-import hudson.util.LogTaskListener;
 import hudson.util.ListBoxModel;
+import hudson.util.LogTaskListener;
 import jenkins.model.Jenkins;
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.Stapler;
+import org.kohsuke.stapler.StaplerRequest;
+import org.kohsuke.stapler.StaplerResponse;
+import org.kohsuke.stapler.bind.JavaScriptMethod;
 
+import javax.servlet.ServletException;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -68,17 +76,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import javax.servlet.ServletException;
-
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.StaplerRequest;
-import org.kohsuke.stapler.StaplerResponse;
-import org.kohsuke.stapler.bind.JavaScriptMethod;
-
-import au.com.centrumsystems.hudson.plugin.buildpipeline.trigger.BuildPipelineTrigger;
-import au.com.centrumsystems.hudson.plugin.util.BuildUtil;
-import au.com.centrumsystems.hudson.plugin.util.ProjectUtil;
 
 /**
  * This view displays the set of jobs that are related
@@ -345,7 +342,13 @@ public class BuildPipelineView extends View {
           return null;
         }
 
-        final int maxNoOfDisplayBuilds = Integer.valueOf(noOfDisplayedBuilds);
+        int maxNoOfDisplayBuilds = Integer.valueOf(noOfDisplayedBuilds);
+
+        StaplerRequest req = Stapler.getCurrentRequest();
+        String size = req.getParameter("size");
+        if (size != null) {
+            maxNoOfDisplayBuilds = Integer.valueOf(size);
+        }
 
         if (gridBuilder == null)  {
           return null;

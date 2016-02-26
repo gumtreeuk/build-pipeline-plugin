@@ -92,7 +92,13 @@ Handlebars.registerHelper('with', function(context, options) {
 Handlebars.registerHelper('log', function(context) {
   Handlebars.log(context);
 });
-;
+
+Handlebars.registerHelper('replace', function (str, a, b) {
+    if(str && typeof str === "string") {
+        return str.split(a).join(b);
+    }
+});
+
 // lib/handlebars/compiler/parser.js
 /* Jison generated parser */
 var handlebars = (function(){
@@ -788,7 +794,8 @@ Handlebars.JavaScriptCompiler = function() {};
         'if': true,
         'unless': true,
         'with': true,
-        'log': true
+        'log': true,
+        'replace': true
       };
       if (knownHelpers) {
         for (var name in knownHelpers) {
