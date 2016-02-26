@@ -344,8 +344,8 @@ public class BuildPipelineView extends View {
 
         int maxNoOfDisplayBuilds = Integer.valueOf(noOfDisplayedBuilds);
 
-        StaplerRequest req = Stapler.getCurrentRequest();
-        String size = req.getParameter("size");
+        final StaplerRequest req = Stapler.getCurrentRequest();
+        final String size = req.getParameter("size");
         if (size != null) {
             maxNoOfDisplayBuilds = Integer.valueOf(size);
         }

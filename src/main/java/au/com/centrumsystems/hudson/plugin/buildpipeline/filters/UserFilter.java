@@ -8,18 +8,22 @@ import org.apache.commons.lang.StringUtils;
 import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 
+/**
+ * Filters builds by the user who triggered them. The desired user is passed in via 'user' request param
+ * @author mrozar
+ */
 public class UserFilter implements Predicate<AbstractBuild<?, ?>> {
     @Override
     public boolean apply(AbstractBuild<?, ?> build) {
-        StaplerRequest req = Stapler.getCurrentRequest();
+        final StaplerRequest req = Stapler.getCurrentRequest();
         String user = req.getParameter("user");
 
         if ("me".equals(user) && User.current() != null) {
             user = User.current().getId();
         }
 
-        Cause.UserCause userCause = build.getCause(Cause.UserCause.class);
-        Cause.UserIdCause userIdCause = build.getCause(Cause.UserIdCause.class);
+        final Cause.UserCause userCause = build.getCause(Cause.UserCause.class);
+        final Cause.UserIdCause userIdCause = build.getCause(Cause.UserIdCause.class);
         if (StringUtils.isNotBlank(user) && userCause != null) {
             return user.equals(userCause.getUserName());
         }

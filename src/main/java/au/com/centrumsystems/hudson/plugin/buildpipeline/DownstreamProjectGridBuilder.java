@@ -103,6 +103,9 @@ public class DownstreamProjectGridBuilder extends ProjectGridBuilder {
             }
         }
 
+        /**
+         * List of filters to use to filter builds to display
+         */
         private List<Predicate<AbstractBuild<?, ?>>> buildFilters =
                 Lists.<Predicate<AbstractBuild<?, ?>>>newArrayList(new UserFilter(), new BuildParameterFilter());
 
