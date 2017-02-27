@@ -24,6 +24,12 @@
  */
 package au.com.centrumsystems.hudson.plugin.buildpipeline;
 
+import au.com.centrumsystems.hudson.plugin.buildpipeline.extension.BuildVariablesHeader;
+import au.com.centrumsystems.hudson.plugin.buildpipeline.extension.NullColumnHeader;
+import au.com.centrumsystems.hudson.plugin.buildpipeline.extension.PipelineHeaderExtension;
+import au.com.centrumsystems.hudson.plugin.buildpipeline.extension.PipelineHeaderExtensionDescriptor;
+import au.com.centrumsystems.hudson.plugin.buildpipeline.extension.SimpleColumnHeader;
+import au.com.centrumsystems.hudson.plugin.buildpipeline.extension.SimpleRowHeader;
 import au.com.centrumsystems.hudson.plugin.buildpipeline.trigger.BuildPipelineTrigger;
 import au.com.centrumsystems.hudson.plugin.util.BuildUtil;
 import au.com.centrumsystems.hudson.plugin.util.ProjectUtil;
@@ -68,6 +74,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -116,11 +123,31 @@ public class BuildPipelineView extends View {
     /** alwaysAllowManualTrigger. */
     private boolean alwaysAllowManualTrigger = true;
 
-    /** showPipelineParameters. */
+    /**
+     * Whether to show pipeline parameter in the revision box
+     * @deprecated - replaced with revisionBoxParameterProvider, keep in place
+     * to migrate data
+     */
+    @Deprecated
     private boolean showPipelineParameters = true;
 
-    /** showPipelineParametersInHeaders */
+    /**
+     * What to show as a row header for pipelines
+     */
+    private PipelineHeaderExtension rowHeaders;
+
+    /**
+     * Whether to show pipeline parameters in the header box
+     * @deprecated  - replaced with headerBoxParameterProvider, keep in place
+     * to migrate data
+     */
+    @Deprecated
     private boolean showPipelineParametersInHeaders;
+
+    /**
+     * What to show as a column headers for jobs in the pipeline
+     */
+    private PipelineHeaderExtension columnHeaders;
 
     /**
      * @deprecated
@@ -137,13 +164,6 @@ public class BuildPipelineView extends View {
 
     /** showPipelineDefinitionHeader. */
     private boolean showPipelineDefinitionHeader;
-
-    /*
-     * Keep feature flag properties in one place so that it is easy to refactor them out later.
-     */
-    /* Feature flags - START */
-
-    /* Feature flags - END */
 
     /** A Logger object is used to log messages */
     private static final Logger LOGGER = Logger.getLogger(BuildPipelineView.class.getName());
@@ -181,6 +201,8 @@ public class BuildPipelineView extends View {
         this.noOfDisplayedBuilds = noOfDisplayedBuilds;
         this.triggerOnlyLatestJob = triggerOnlyLatestJob;
         this.cssUrl = cssUrl;
+        this.rowHeaders = new NullColumnHeader();
+        this.columnHeaders = new SimpleRowHeader();
     }
 
     /**
@@ -210,19 +232,27 @@ public class BuildPipelineView extends View {
      *            URL for the custom CSS file.
      * @param selectedJob
      *            the first job name in the pipeline. it can be set to null when gridBuilder is passed.
+     * @param columnHeaders
+     *            see {@link #columnHeaders}
+     * @param rowHeaders
+     *            see {@link #rowHeaders}
      */
     @DataBoundConstructor
     public BuildPipelineView(final String name, final String buildViewTitle, final ProjectGridBuilder gridBuilder,
             final String noOfDisplayedBuilds,
             final boolean triggerOnlyLatestJob, final boolean alwaysAllowManualTrigger, final boolean showPipelineParameters,
             final boolean showPipelineParametersInHeaders, final boolean showPipelineDefinitionHeader,
-            final int refreshFrequency, final String cssUrl, final String selectedJob) {
+            final int refreshFrequency, final String cssUrl, final String selectedJob,
+            final PipelineHeaderExtension columnHeaders,
+            final PipelineHeaderExtension rowHeaders) {
         this(name, buildViewTitle, gridBuilder, noOfDisplayedBuilds, triggerOnlyLatestJob, cssUrl);
         this.alwaysAllowManualTrigger = alwaysAllowManualTrigger;
         this.showPipelineParameters = showPipelineParameters;
         this.showPipelineParametersInHeaders = showPipelineParametersInHeaders;
         this.showPipelineDefinitionHeader = showPipelineDefinitionHeader;
         this.selectedJob = selectedJob;
+        this.columnHeaders = columnHeaders;
+        this.rowHeaders = rowHeaders;
         //not exactly understanding the lifecycle here, but I want a default of 3
         //(this is what the class variable is set to 3, if it's 0, set it to default, refresh of 0 does not make sense anyway)
         if (refreshFrequency < 1) {
@@ -230,7 +260,7 @@ public class BuildPipelineView extends View {
         } else {
             this.refreshFrequency = refreshFrequency;
         }
-        
+
         //for remote api support
         if (this.gridBuilder == null) {
             if (this.selectedJob != null) {
@@ -246,6 +276,12 @@ public class BuildPipelineView extends View {
     }
 
     /**
+     * Migrate old data, set new fields
+     *
+     * @see
+     *      <a href="https://wiki.jenkins-ci.org/display/JENKINS/Hint+on+retaining+backward+compatibility">
+     *          Jenkins wiki entry on the subject</a>
+     *
      * @return
      *      must be always 'this'
      */
@@ -254,7 +290,28 @@ public class BuildPipelineView extends View {
             if (selectedJob != null) {
                 gridBuilder = new DownstreamProjectGridBuilder(selectedJob);
             }
+        } else {
+            // safe to assume an existing install, check if we need to migrate
+            // header config
+            if (columnHeaders == null) {
+                if (!showPipelineDefinitionHeader) {
+                    columnHeaders = new NullColumnHeader();
+                } else if (showPipelineParametersInHeaders) {
+                    columnHeaders = new BuildVariablesHeader();
+                } else {
+                    columnHeaders = new SimpleColumnHeader();
+                }
+            }
+            if (rowHeaders == null) {
+                if (showPipelineParameters) {
+                    rowHeaders = new BuildVariablesHeader();
+                } else {
+                    rowHeaders = new SimpleRowHeader();
+                }
+            }
         }
+
+
         return this;
     }
 
@@ -291,6 +348,22 @@ public class BuildPipelineView extends View {
      */ 
     public boolean isProjectParameterized() {
         return getGridBuilder().startsWithParameters(this);
+    }
+
+    public PipelineHeaderExtension getColumnHeaders() {
+        return columnHeaders;
+    }
+
+    public void setColumnHeaders(PipelineHeaderExtension columnHeaders) {
+        this.columnHeaders = columnHeaders;
+    }
+
+    public PipelineHeaderExtension getRowHeaders() {
+        return rowHeaders;
+    }
+
+    public void setRowHeaders(PipelineHeaderExtension rowHeaders) {
+        this.rowHeaders = rowHeaders;
     }
 
     /**
@@ -478,10 +551,12 @@ public class BuildPipelineView extends View {
             final Action buildParametersAction) {
         LOGGER.fine("Triggering build for project: " + triggerProject.getFullDisplayName()); //$NON-NLS-1$
         final List<Action> buildActions = new ArrayList<Action>();
-        final CauseAction causeAction = new CauseAction(new UserIdCause());
+        final List<Cause> causes = new ArrayList<Cause>();
+        causes.add(new UserIdCause());
         if (upstreamBuild != null) {
-            causeAction.getCauses().add(new Cause.UpstreamCause((Run<?, ?>) upstreamBuild));
+            causes.add(new Cause.UpstreamCause((Run<?, ?>) upstreamBuild));
         }
+        final CauseAction causeAction = new CauseAction(causes);
         buildActions.add(causeAction);
         ParametersAction parametersAction =
                 buildParametersAction instanceof ParametersAction
@@ -493,8 +568,8 @@ public class BuildPipelineView extends View {
             final List<AbstractBuildParameters> configs = retrieveUpstreamProjectTriggerConfig(triggerProject, upstreamBuild);
 
             if (configs == null) {
-                LOGGER.log(Level.SEVERE, "No upstream trigger found for this project" + triggerProject.getFullDisplayName());
-                throw new IllegalStateException("No upstream trigger found for this project" + triggerProject.getFullDisplayName());
+                LOGGER.log(Level.SEVERE, "No upstream trigger found for this project: " + triggerProject.getFullDisplayName());
+                throw new IllegalStateException("No upstream trigger found for this project: " + triggerProject.getFullDisplayName());
             }
 
             for (final AbstractBuildParameters config : configs) {
@@ -536,10 +611,16 @@ public class BuildPipelineView extends View {
 
         final BuildPipelineTrigger manualTrigger = upstreamProjectPublishersList.get(BuildPipelineTrigger.class);
         if (manualTrigger != null) {
+            LOGGER.fine("Found Manual Trigger (BuildPipelineTrigger) found in upstream project publisher list ");
             final Set<String> downstreamProjectsNames =
                     Sets.newHashSet(Splitter.on(",").trimResults().split(manualTrigger.getDownstreamProjectNames()));
+            LOGGER.fine("Downstream project names: " + downstreamProjectsNames);
+            // defect: requires full name in the trigger. But downstream is just fine!
             if (downstreamProjectsNames.contains(project.getFullName())) {
                 configs = manualTrigger.getConfigs();
+            } else {
+                LOGGER.warning("Upstream project had a Manual Trigger for projects [" + downstreamProjectsNames
+                        + "], but that did not include our project [" + project.getFullName() + "]");
             }
         }
 
@@ -600,13 +681,14 @@ public class BuildPipelineView extends View {
         final List<Action> retval = new ArrayList<Action>();
         for (final Action action : actions) {
             if (action instanceof CauseAction) {
-                final CauseAction causeAction = (CauseAction) action;
-                filterOutUserIdCause(causeAction);
+                final CauseAction causeAction  = filterOutUserIdCause((CauseAction) action);
                 if (!causeAction.getCauses().isEmpty()) {
                     retval.add(causeAction);
                 }
             } else if (action instanceof ParametersAction) {
                 retval.add(action);
+            } else if ("hudson.plugins.git.RevisionParameterAction".equals(action.getClass().getName())) {
+                 retval.add(action);
             }
         }
         return retval;
@@ -620,15 +702,18 @@ public class BuildPipelineView extends View {
      *
      * @param causeAction
      *  the causeAction to remove UserIdCause from
+     * @return a causeAction with UserIdCause removed
      */
-    private void filterOutUserIdCause(CauseAction causeAction) {
+    private CauseAction filterOutUserIdCause(CauseAction causeAction) {
+        final List<Cause> causes = new ArrayList<Cause>();
         final Iterator<Cause> it = causeAction.getCauses().iterator();
         while (it.hasNext()) {
             final Cause cause = it.next();
-            if (cause instanceof UserIdCause) {
-                it.remove();
+            if (!(cause instanceof UserIdCause)) {
+                causes.add(cause);
             }
         }
+        return new CauseAction(causes);
     }
 
     /**
@@ -682,6 +767,49 @@ public class BuildPipelineView extends View {
         }
 
         /**
+         * @param condition
+         *       if true, return it as part of the returned list
+         * @return
+         *      a filtered and ordered list of descriptors matching the condition
+         */
+        public List<PipelineHeaderExtensionDescriptor> filter(Function<PipelineHeaderExtensionDescriptor, Boolean> condition) {
+            final List<PipelineHeaderExtensionDescriptor> result = new ArrayList<PipelineHeaderExtensionDescriptor>();
+            final List<PipelineHeaderExtension> applicableExtensions = new ArrayList<PipelineHeaderExtension>();
+            for (PipelineHeaderExtensionDescriptor descriptor : PipelineHeaderExtensionDescriptor.all()) {
+                if (condition.apply(descriptor)) {
+                    result.add(descriptor);
+                }
+            }
+            Collections.sort(result);
+            return result;
+        }
+
+        /**
+         * @return a list of PipelineHeaderExtension descriptors which can be used as a row header
+         */
+        public List<PipelineHeaderExtensionDescriptor> getRowHeaderDescriptors() {
+            return filter(new Function<PipelineHeaderExtensionDescriptor, Boolean>() {
+                @Override
+                public Boolean apply(PipelineHeaderExtensionDescriptor extension) {
+                    return extension.appliesToRows();
+                }
+            });
+        }
+
+        /**
+         * @return a list of PipelineHeaderExtension descriptors which can be used as column headers
+         */
+        public List<PipelineHeaderExtensionDescriptor> getColumnHeaderDescriptors() {
+            return filter(new Function<PipelineHeaderExtensionDescriptor, Boolean>() {
+
+                @Override
+                public Boolean apply(PipelineHeaderExtensionDescriptor extension) {
+                    return extension.appliesToColumns();
+                }
+            });
+        }
+
+        /**
          * Display Console Output Link Style Items in the Edit View Page
          *
          * @return ListBoxModel
@@ -693,6 +821,26 @@ public class BuildPipelineView extends View {
             options.add(LinkStyle.THIS_WINDOW);
             return options;
         }
+    }
+
+    /**
+     * A function which accepts an argument and returns a result. Necessary to parameterize behavior,
+     * because we do not require JDK8 yet.
+     *
+     * @see <a href="http://docs.oracle.com/javase/8/docs/api/java/util/function/Function.html">
+     *     JDK8 java.lang.Function
+     *     </a>
+     */
+    public interface Function<F, T> {
+
+        /**
+         * Applies this function to the argument
+         * @param input
+         *  an input
+         * @return
+         *  a result
+         */
+        T apply(F input);
     }
 
     public String getBuildViewTitle() {
@@ -757,30 +905,6 @@ public class BuildPipelineView extends View {
 
     public void setAlwaysAllowManualTrigger(final boolean alwaysAllowManualTrigger) {
         this.alwaysAllowManualTrigger = alwaysAllowManualTrigger;
-    }
-
-    public boolean isShowPipelineParameters() {
-        return showPipelineParameters;
-    }
-
-    public String getShowPipelineParameters() {
-        return Boolean.toString(showPipelineParameters);
-    }
-
-    public void setShowPipelineParameters(final boolean showPipelineParameters) {
-        this.showPipelineParameters = showPipelineParameters;
-    }
-
-    public boolean isShowPipelineParametersInHeaders() {
-        return showPipelineParametersInHeaders;
-    }
-
-    public String getShowPipelineParametersInHeaders() {
-        return Boolean.toString(showPipelineParametersInHeaders);
-    }
-
-    public void setShowPipelineParametersInHeaders(final boolean showPipelineParametersInHeaders) {
-        this.showPipelineParametersInHeaders = showPipelineParametersInHeaders;
     }
 
     public int getRefreshFrequency() {
@@ -878,8 +1002,7 @@ public class BuildPipelineView extends View {
         boolean display = true;
         //tester la liste vide seulement en lecture
         if (READ.name.equals(p.name)) {
-          final Collection<TopLevelItem> items = this.getItems();
-          if (items == null || items.isEmpty()) {
+            if (isEmpty()) {
                 display = false;
             }
         } else {
@@ -888,5 +1011,16 @@ public class BuildPipelineView extends View {
         }
 
         return display;
-    } 
+    }
+
+    /**
+     * determine if this view is empty
+     * @return true if this view contains zero items
+     */
+    private boolean isEmpty() {
+        if (noOfDisplayedBuilds == null || gridBuilder == null) {
+            return true;
+        }
+        return gridBuilder.build(this).isEmpty();
+    }
 }
